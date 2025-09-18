@@ -286,4 +286,51 @@ if (state.tasks.length === 0) {
   ];
 }
 
+// ===== Modo oscuro =====
+const THEME_KEY = "todo-app-theme";
+
+function getStoredTheme(): string {
+  try {
+    return localStorage.getItem(THEME_KEY) || "light";
+  } catch {
+    return "light";
+  }
+}
+
+function saveTheme(theme: string): void {
+  try {
+    localStorage.setItem(THEME_KEY, theme);
+  } catch {
+    // Ignorar errores de localStorage
+  }
+}
+
+function updateThemeButton(theme: string): void {
+  const $toggleDark = document.getElementById("toggle-dark") as HTMLButtonElement | null;
+  if ($toggleDark) {
+    $toggleDark.innerHTML = theme === "dark"
+      ? '<i class="bi bi-sun me-1"></i> Modo claro'
+      : '<i class="bi bi-moon me-1"></i> Modo oscuro';
+  }
+}
+
+function setTheme(theme: string): void {
+  document.documentElement.setAttribute("data-bs-theme", theme);
+  updateThemeButton(theme);
+  saveTheme(theme);
+}
+
+// Inicializar tema al cargar
+const storedTheme = getStoredTheme();
+setTheme(storedTheme);
+
+const $toggleDark = document.getElementById("toggle-dark") as HTMLButtonElement | null;
+if ($toggleDark) {
+  $toggleDark.addEventListener("click", () => {
+    const current = document.documentElement.getAttribute("data-bs-theme") || "light";
+    const next = current === "dark" ? "light" : "dark";
+    setTheme(next);
+  });
+}
+
 render();
