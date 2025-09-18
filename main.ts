@@ -4,6 +4,7 @@ type Filter = "all" | "active" | "done";
 interface Task {
   id: string;
   title: string;
+  description?: string;
   done: boolean;
   createdAt: number;
 }
@@ -55,6 +56,7 @@ const $clearDone = document.getElementById("clear-done") as HTMLButtonElement;
 const $filterButtons = Array.from(
   document.querySelectorAll<HTMLButtonElement>('button[data-filter]')
 );
+const $description = document.getElementById("task-description") as HTMLTextAreaElement;
 
 // Stats (opcionales)
 const $statActive = document.getElementById("stat-active") as HTMLElement | null;
@@ -65,9 +67,12 @@ const $statTotal = document.getElementById("stat-total") as HTMLElement | null;
 function addTask(title: string): void {
   const trimmed = (title ?? "").trim();
   if (!trimmed) return;
-  state.tasks.unshift({ id: uid(), title: trimmed, done: false, createdAt: Date.now() });
+  const description = $description.value.trim() || undefined;
+
+  state.tasks.unshift({ id: uid(), title: trimmed, description, done: false, createdAt: Date.now() });
   render();
   $input.value = "";
+  $description.value = "";
   $input.focus();
 }
 
@@ -98,10 +103,11 @@ function viewTask(id: string): void {
     return;
   }
   const created = new Date(t.createdAt).toLocaleString();
+  const description = t.description ? `\nDescripción: ${t.description}` : "";
   alert(
     `📄 Detalle de la tarea\n\n` +
     `ID: ${t.id}\n` +
-    `Título: ${t.title}\n` +
+    `Título: ${t.title}${description}\n` +
     `Estado: ${t.done ? "Completada" : "Activa"}\n` +
     `Creada: ${created}`
   );
@@ -137,8 +143,8 @@ function resetAll(): void {
 function visibleTasks(): Task[] {
   switch (state.filter) {
     case "active": return state.tasks.filter(t => !t.done);
-    case "done":   return state.tasks.filter(t =>  t.done);
-    default:       return state.tasks;
+    case "done": return state.tasks.filter(t => t.done);
+    default: return state.tasks;
   }
 }
 
@@ -204,6 +210,12 @@ function render(): void {
     // Body (meta)
     const body = document.createElement("div");
     body.className = "card-body py-2";
+    if (t.description) {
+      const descDiv = document.createElement("div");
+      descDiv.className = "text-muted small mb-2";
+      descDiv.textContent = t.description;
+      body.appendChild(descDiv);
+    }
     const meta = document.createElement("div");
     meta.className = "text-secondary small";
     meta.textContent = "Creada: " + new Date(t.createdAt).toLocaleString();
@@ -242,8 +254,8 @@ function render(): void {
 
   $counter.textContent = `${total} tareas • ${done} completadas`;
   if ($statActive) $statActive.textContent = String(active);
-  if ($statDone)   $statDone.textContent = String(done);
-  if ($statTotal)  $statTotal.textContent = String(total);
+  if ($statDone) $statDone.textContent = String(done);
+  if ($statTotal) $statTotal.textContent = String(total);
 
   // Filtro activo
   for (const b of $filterButtons) {
@@ -280,9 +292,9 @@ state.tasks = loadTasks();
 if (state.tasks.length === 0) {
   // Semillas de demo si está vacío
   state.tasks = [
-    { id: uid(), title: "Revisar TypeScript",          done: true,  createdAt: Date.now() - 60000 },
+    { id: uid(), title: "Revisar TypeScript", done: true, createdAt: Date.now() - 60000 },
     { id: uid(), title: "Agregar validación de tipos", done: false, createdAt: Date.now() - 40000 },
-    { id: uid(), title: "Probar filtros y cards",      done: false, createdAt: Date.now() - 20000 },
+    { id: uid(), title: "Probar filtros y cards", done: false, createdAt: Date.now() - 20000 },
   ];
 }
 
