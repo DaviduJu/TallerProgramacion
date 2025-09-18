@@ -289,3 +289,37 @@ small.fw-normal{ letter-spacing: .2px; }
 [data-bs-theme="dark"] input[type="datetime-local"] {
   color-scheme: dark;
 }
+/* ---------- Badges de prioridad ---------- */
+.badge.prioridad-alta {
+  background-color: #dc3545 !important;
+  color: white !important;
+}
+
+.badge.prioridad-media {
+  background-color: #ffc107 !important;
+  color: black !important;
+}
+
+.badge.prioridad-baja {
+  background-color: #198754 !important;
+  color: white !important;
+}
+
+/* ---------- Badges de categoría ---------- */
+.badge.categoria-matematicas {
+  background-color: #6f42c1 !important;
+  color: white !important;
+}
+
+.badge.categoria-espanol {
+  background-color: #20c997 !important;
+  color: white !important;
+}
+
+/* Ajustes estéticos para badges */
+.card-header .badge {
+  font-weight: 600;
+  padding: 0.35rem 0.6rem;
+  border-radius: 0.35rem;
+  font-size: 0.75rem;
+}

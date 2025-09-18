@@ -1,5 +1,7 @@
 // ===== Tipos =====
 type Filter = "all" | "active" | "done";
+type Prioridad = 'alta' | 'media' | 'baja';
+type Categoria = 'matematicas' | 'espanol';
 
 interface Task {
   id: string;
@@ -8,6 +10,8 @@ interface Task {
   done: boolean;
   createdAt: number;
   dueDate?: number;
+  prioridad: Prioridad;
+  categoria?: Categoria;
 }
 
 interface AppState {
@@ -49,6 +53,10 @@ function clearAllStorage(): void {
 }
 
 // ===== DOM =====
+const $tituloTarea = document.getElementById("tituloTarea") as HTMLInputElement;
+const $prioridadTarea = document.getElementById("prioridadTarea") as HTMLSelectElement;
+const $categoriaTarea = document.getElementById("categoriaTarea") as HTMLSelectElement;
+const $taskForm = document.getElementById("task-form") as HTMLFormElement;
 const $input = document.getElementById("task-input") as HTMLInputElement;
 const $addBtn = document.getElementById("add-btn") as HTMLButtonElement;
 const $list = document.getElementById("list") as HTMLElement;
@@ -74,6 +82,8 @@ function addTask(title: string): void {
   const description = $description.value.trim() || undefined;
   const dueDateValue = $dueDate.value;
   const dueDate = dueDateValue ? new Date(dueDateValue).getTime() : undefined;
+  const prioridad = $prioridadTarea.value as Prioridad;
+  const categoria = $categoriaTarea.value as Categoria;
 
   state.tasks.unshift({ 
     id: uid(), 
@@ -81,13 +91,17 @@ function addTask(title: string): void {
     description, 
     done: false, 
     createdAt: Date.now(),
-    dueDate
+    dueDate,
+    prioridad,
+    categoria
   });
   render();
-  $input.value = "";
+  $tituloTarea.value = "";
   $description.value = "";
   $dueDate.value = "";
-  $input.focus();
+  $prioridadTarea.value = "media"; // Reset to default
+  $categoriaTarea.value = "matematicas"; // Reset to default
+  $tituloTarea.focus();
 }
 
 function toggleTask(id: string): void {
@@ -120,12 +134,16 @@ function viewTask(id: string): void {
   const description = t.description ? `\nDescripción: ${t.description}` : "";
   const dueInfo = t.dueDate ? `\nVence: ${new Date(t.dueDate).toLocaleString()}` : "";
   const overdue = t.dueDate && t.dueDate < Date.now() && !t.done ? "\n⚠️ VENCIDA" : "";
-  
+  const prioridadText = `\nPrioridad: ${t.prioridad.charAt(0).toUpperCase() + t.prioridad.slice(1)}`;
+  const categoriaText = `\nCategoría: ${t.categoria === 'matematicas' ? 'Matemáticas' : 'Español'}`;
+
   alert(
     `📄 Detalle de la tarea\n\n` +
     `ID: ${t.id}\n` +
     `Título: ${t.title}${description}${dueInfo}${overdue}\n` +
     `Estado: ${t.done ? "Completada" : "Activa"}\n` +
+    `Prioridad: ${t.prioridad}\n` +
+    `Categoría: ${t.categoria}\n` +
     `Creada: ${created}`
   );
 }
@@ -223,7 +241,24 @@ function ensureResetButton(): void {
 
   container.append(spacer, btn);
 }
+// Función para obtener clase CSS del badge de prioridad
+function getPriorityBadgeClass(prioridad: Prioridad): string {
+  switch (prioridad) {
+    case 'alta': return 'badge bg-danger';
+    case 'media': return 'badge bg-warning text-dark';
+    case 'baja': return 'badge bg-success';
+    default: return 'badge bg-secondary';
+  }
+}
 
+// Función para obtener clase CSS del badge de categoría
+function getCategoryBadgeClass(categoria: Categoria): string {
+  switch (categoria) {
+    case 'matematicas': return 'badge bg-purple';
+    case 'espanol': return 'badge bg-teal';
+    default: return 'badge bg-secondary';
+  }
+}
 // ===== Render =====
 function render(): void {
   const tasks = visibleTasks();
@@ -257,19 +292,37 @@ function render(): void {
     title.className = "ms-1 fw-semibold task-title";
     title.textContent = t.title;
     if (t.done) title.classList.add("text-decoration-line-through");
-
-    header.append(checkbox, title);
+    
+// Badge de prioridad
+    const priorityBadge = document.createElement("span");
+    priorityBadge.className = `badge ${getPriorityBadgeClass(t.prioridad)}`;
+    priorityBadge.textContent = t.prioridad.toUpperCase();
+    
+    header.append(checkbox, title, priorityBadge);
 
     const body = document.createElement("div");
     body.className = "card-body py-2";
-    
+
+  
+    // Badge de categoría
+    const categoryBadge = document.createElement("span");
+    categoryBadge.className = `${getCategoryBadgeClass(t.categoria ?? 'matematicas')} mb-2`;
+    categoryBadge.textContent = t.categoria === 'matematicas' ? 'Matemáticas' : 'Español';
+    body.appendChild(categoryBadge);
+    // Mostrar badge de vencida si la tarea está vencida y no está completada
+    if (isOverdue(t)) {
+      const overdueBadge = document.createElement("span");
+      overdueBadge.className = "badge bg-danger ms-2";
+      overdueBadge.textContent = "VENCIDA";
+      body.appendChild(overdueBadge);
+    }    
     if (t.description) {
       const descDiv = document.createElement("div");
       descDiv.className = "text-muted small mb-2";
       descDiv.textContent = t.description;
       body.appendChild(descDiv);
     }
-    
+
     // Fecha límite si existe
     if (t.dueDate) {
       const dueDateDiv = document.createElement("div");
@@ -365,11 +418,33 @@ document.addEventListener("keydown", (e: KeyboardEvent) => {
 state.tasks = loadTasks();
 if (state.tasks.length === 0) {
   state.tasks = [
-    { id: uid(), title: "Revisar TypeScript", done: true, createdAt: Date.now() - 60000 },
-    { id: uid(), title: "Agregar validación de tipos", done: false, createdAt: Date.now() - 40000 },
-    { id: uid(), title: "Probar filtros y cards", done: false, createdAt: Date.now() - 20000 },
+    { 
+      id: uid(), 
+      title: "Revisar TypeScript", 
+      done: true, 
+      createdAt: Date.now() - 60000,
+      prioridad: 'media',
+      categoria: 'matematicas'
+    },
+    { 
+      id: uid(), 
+      title: "Agregar validación de tipos", 
+      done: false, 
+      createdAt: Date.now() - 40000,
+      prioridad: 'alta',
+      categoria: 'espanol'
+    },
+    { 
+      id: uid(), 
+      title: "Probar filtros y cards", 
+      done: false, 
+      createdAt: Date.now() - 20000,
+      prioridad: 'baja',
+      categoria: 'matematicas'
+    },
   ];
 }
+
 
 // ===== Modo oscuro =====
 const THEME_KEY = "todo-app-theme";
