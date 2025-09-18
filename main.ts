@@ -7,6 +7,7 @@ interface Task {
   description?: string;
   done: boolean;
   createdAt: number;
+  dueDate?: number;
 }
 
 interface AppState {
@@ -59,6 +60,7 @@ const $filterButtons = Array.from(
 );
 const $description = document.getElementById("task-description") as HTMLTextAreaElement;
 const $search = document.getElementById("search") as HTMLInputElement; // 🔹 Nuevo
+const $dueDate = document.getElementById("task-due-date") as HTMLInputElement; // Nueva fecha límite
 
 // Stats
 const $statActive = document.getElementById("stat-active") as HTMLElement | null;
@@ -70,11 +72,21 @@ function addTask(title: string): void {
   const trimmed = (title ?? "").trim();
   if (!trimmed) return;
   const description = $description.value.trim() || undefined;
+  const dueDateValue = $dueDate.value;
+  const dueDate = dueDateValue ? new Date(dueDateValue).getTime() : undefined;
 
-  state.tasks.unshift({ id: uid(), title: trimmed, description, done: false, createdAt: Date.now() });
+  state.tasks.unshift({ 
+    id: uid(), 
+    title: trimmed, 
+    description, 
+    done: false, 
+    createdAt: Date.now(),
+    dueDate
+  });
   render();
   $input.value = "";
   $description.value = "";
+  $dueDate.value = "";
   $input.focus();
 }
 
@@ -106,15 +118,17 @@ function viewTask(id: string): void {
   }
   const created = new Date(t.createdAt).toLocaleString();
   const description = t.description ? `\nDescripción: ${t.description}` : "";
+  const dueInfo = t.dueDate ? `\nVence: ${new Date(t.dueDate).toLocaleString()}` : "";
+  const overdue = t.dueDate && t.dueDate < Date.now() && !t.done ? "\n⚠️ VENCIDA" : "";
+  
   alert(
     `📄 Detalle de la tarea\n\n` +
     `ID: ${t.id}\n` +
-    `Título: ${t.title}${description}\n` +
+    `Título: ${t.title}${description}${dueInfo}${overdue}\n` +
     `Estado: ${t.done ? "Completada" : "Activa"}\n` +
     `Creada: ${created}`
   );
 }
-
 function editTaskTitle(id: string): void {
   const t = state.tasks.find(x => x.id === id);
   if (!t) {
@@ -162,6 +176,34 @@ function setSearch(q: string): void {
   render();
 }
 
+// Función para verificar si una tarea está vencida
+function isOverdue(task: Task): boolean {
+  return !!(task.dueDate && task.dueDate < Date.now() && !task.done);
+}
+
+// Función para obtener el estado de vencimiento
+function getDueDateStatus(task: Task): "overdue" | "today" | "soon" | "normal" {
+  if (!task.dueDate || task.done) return "normal";
+  
+  const now = Date.now();
+  const due = task.dueDate;
+  const dayInMs = 24 * 60 * 60 * 1000;
+  
+  if (due < now) return "overdue";
+  if (due < now + dayInMs) return "today";
+  if (due < now + (3 * dayInMs)) return "soon";
+  return "normal";
+}
+
+// Función para mostrar notificaciones de tareas vencidas
+function checkOverdueTasks(): void {
+  const overdue = state.tasks.filter(isOverdue);
+  if (overdue.length > 0) {
+    const titles = overdue.map(t => `• ${t.title}`).join('\n');
+    console.warn(`⚠️ Tienes ${overdue.length} tarea(s) vencida(s):\n${titles}`);
+  }
+}
+
 // ===== Reset Button =====
 function ensureResetButton(): void {
   const existing = document.getElementById("reset-all") as HTMLButtonElement | null;
@@ -195,7 +237,11 @@ function render(): void {
 
     const card = document.createElement("div");
     card.className = "card h-100 shadow-sm";
-    if (t.done) card.classList.add("border-success", "opacity-75");
+    if (t.done) {
+      card.classList.add("border-success", "opacity-75");
+    } else if (isOverdue(t)) {
+      card.classList.add("border-danger");
+    }
 
     const header = document.createElement("div");
     header.className = "card-header bg-transparent d-flex align-items-center gap-2";
@@ -216,11 +262,38 @@ function render(): void {
 
     const body = document.createElement("div");
     body.className = "card-body py-2";
+    
     if (t.description) {
       const descDiv = document.createElement("div");
       descDiv.className = "text-muted small mb-2";
       descDiv.textContent = t.description;
       body.appendChild(descDiv);
+    }
+    
+    // Fecha límite si existe
+    if (t.dueDate) {
+      const dueDateDiv = document.createElement("div");
+      const dueStatus = getDueDateStatus(t);
+      const dueText = new Date(t.dueDate).toLocaleDateString();
+      
+      switch (dueStatus) {
+        case "overdue":
+          dueDateDiv.className = "text-danger small fw-bold mb-2";
+          dueDateDiv.innerHTML = `⚠️ Vencida: ${dueText}`;
+          break;
+        case "today":
+          dueDateDiv.className = "text-warning small fw-bold mb-2";
+          dueDateDiv.innerHTML = `🔥 Vence hoy: ${dueText}`;
+          break;
+        case "soon":
+          dueDateDiv.className = "text-primary small fw-semibold mb-2";
+          dueDateDiv.innerHTML = `📅 Vence: ${dueText}`;
+          break;
+        default:
+          dueDateDiv.className = "text-muted small mb-2";
+          dueDateDiv.innerHTML = `📅 Vence: ${dueText}`;
+      }
+      body.appendChild(dueDateDiv);
     }
     const meta = document.createElement("div");
     meta.className = "text-secondary small";
@@ -266,6 +339,7 @@ function render(): void {
   }
 
   ensureResetButton();
+  checkOverdueTasks();
   saveTasks();
 }
 

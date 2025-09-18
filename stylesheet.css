@@ -274,3 +274,18 @@ small.fw-normal{ letter-spacing: .2px; }
 [data-bs-theme="dark"] .card .task-title {
   color: #e9edf6 !important;
 }
+
+/* Estilos para tareas vencidas */
+.card.border-danger {
+  border-color: var(--danger) !important;
+  box-shadow: 0 0 0 1px rgba(255, 107, 107, 0.2);
+}
+
+[data-bs-theme="dark"] .card.border-danger {
+  box-shadow: 0 0 0 1px rgba(255, 107, 107, 0.3);
+}
+
+/* Mejoras para el input datetime-local en modo oscuro */
+[data-bs-theme="dark"] input[type="datetime-local"] {
+  color-scheme: dark;
+}
