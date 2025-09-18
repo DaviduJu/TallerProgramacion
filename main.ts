@@ -11,11 +11,12 @@ interface Task {
 interface AppState {
   tasks: Task[];
   filter: Filter;
+  search?: string; // 🔹 Nuevo campo para búsqueda
 }
 
 // ===== Estado =====
-const state: AppState = { tasks: [], filter: "all" };
-const uid = (): string => Math.random().toString(36).slice(2, 10);
+const state: AppState = { tasks: [], filter: "all", search: "" };
+const uid = (): string => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2, 10));
 
 // ===== Persistencia con localStorage =====
 const STORAGE_KEY = "todo-app-tasks";
@@ -24,7 +25,7 @@ function saveTasks(): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.tasks));
   } catch {
-    // Ignorar errores de cuota/permiso
+    // Ignorar errores
   }
 }
 
@@ -48,15 +49,16 @@ function clearAllStorage(): void {
 // ===== DOM =====
 const $input = document.getElementById("task-input") as HTMLInputElement;
 const $addBtn = document.getElementById("add-btn") as HTMLButtonElement;
-const $list = document.getElementById("list") as HTMLElement; // grid (row)
+const $list = document.getElementById("list") as HTMLElement;
 const $counter = document.getElementById("counter") as HTMLSpanElement;
 const $empty = document.getElementById("empty") as HTMLDivElement;
 const $clearDone = document.getElementById("clear-done") as HTMLButtonElement;
 const $filterButtons = Array.from(
   document.querySelectorAll<HTMLButtonElement>('button[data-filter]')
 );
+const $search = document.getElementById("search") as HTMLInputElement; // 🔹 Nuevo
 
-// Stats (opcionales)
+// Stats
 const $statActive = document.getElementById("stat-active") as HTMLElement | null;
 const $statDone = document.getElementById("stat-done") as HTMLElement | null;
 const $statTotal = document.getElementById("stat-total") as HTMLElement | null;
@@ -114,7 +116,7 @@ function editTaskTitle(id: string): void {
     return;
   }
   const nuevo = prompt("Nuevo título para la tarea:", t.title);
-  if (nuevo === null) return; // cancelado
+  if (nuevo === null) return;
   const trimmed = nuevo.trim();
   if (!trimmed) {
     alert("El título no puede estar vacío.");
@@ -135,19 +137,30 @@ function resetAll(): void {
 
 // ===== Helpers =====
 function visibleTasks(): Task[] {
+  let filtered: Task[] = [];
   switch (state.filter) {
-    case "active": return state.tasks.filter(t => !t.done);
-    case "done":   return state.tasks.filter(t =>  t.done);
-    default:       return state.tasks;
+    case "active": filtered = state.tasks.filter(t => !t.done); break;
+    case "done":   filtered = state.tasks.filter(t =>  t.done); break;
+    default:       filtered = state.tasks;
   }
+  // 🔹 aplicar búsqueda
+  const query = (state.search ?? "").toLowerCase();
+  if (query) {
+    filtered = filtered.filter(t => t.title.toLowerCase().includes(query));
+  }
+  return filtered;
 }
 
-// Crea e inserta el botón "Resetear lista" junto a "Eliminar completadas"
+function setSearch(q: string): void {
+  state.search = q;
+  render();
+}
+
+// ===== Reset Button =====
 function ensureResetButton(): void {
   const existing = document.getElementById("reset-all") as HTMLButtonElement | null;
   if (existing) return;
 
-  // Intentar ubicarlo al lado del botón #clear-done
   const container = $clearDone?.parentElement ?? document.body;
   const btn = document.createElement("button");
   btn.id = "reset-all";
@@ -156,7 +169,6 @@ function ensureResetButton(): void {
   btn.innerHTML = '<i class="bi bi-x-circle me-1"></i> Resetear lista';
   btn.addEventListener("click", resetAll);
 
-  // Agregar pequeña separación
   const spacer = document.createElement("span");
   spacer.className = "d-inline-block";
   spacer.style.width = "6px";
@@ -168,13 +180,9 @@ function ensureResetButton(): void {
 function render(): void {
   const tasks = visibleTasks();
 
-  // Vacío
   $empty.classList.toggle("d-none", tasks.length !== 0);
-
-  // Limpiar grid
   $list.innerHTML = "";
 
-  // Pintar cada task como Card
   for (const t of tasks) {
     const col = document.createElement("div");
     col.className = "col";
@@ -183,7 +191,6 @@ function render(): void {
     card.className = "card h-100 shadow-sm";
     if (t.done) card.classList.add("border-success", "opacity-75");
 
-    // Header (checkbox + título)
     const header = document.createElement("div");
     header.className = "card-header bg-transparent d-flex align-items-center gap-2";
 
@@ -201,7 +208,6 @@ function render(): void {
 
     header.append(checkbox, title);
 
-    // Body (meta)
     const body = document.createElement("div");
     body.className = "card-body py-2";
     const meta = document.createElement("div");
@@ -209,7 +215,6 @@ function render(): void {
     meta.textContent = "Creada: " + new Date(t.createdAt).toLocaleString();
     body.appendChild(meta);
 
-    // Footer (acciones)
     const footer = document.createElement("div");
     footer.className = "card-footer bg-transparent d-flex justify-content-end gap-2";
 
@@ -235,7 +240,6 @@ function render(): void {
     $list.appendChild(col);
   }
 
-  // Contador y stats
   const total = state.tasks.length;
   const done = state.tasks.filter(t => t.done).length;
   const active = total - done;
@@ -245,15 +249,11 @@ function render(): void {
   if ($statDone)   $statDone.textContent = String(done);
   if ($statTotal)  $statTotal.textContent = String(total);
 
-  // Filtro activo
   for (const b of $filterButtons) {
     b.classList.toggle("active", b.dataset.filter === state.filter);
   }
 
-  // Asegurar botón Reset en la UI
   ensureResetButton();
-
-  // Guardar después de actualizar la vista/estado
   saveTasks();
 }
 
@@ -266,8 +266,8 @@ $clearDone.addEventListener("click", clearDone);
 for (const b of $filterButtons) {
   b.addEventListener("click", () => setFilter((b.dataset.filter as Filter) ?? "all"));
 }
+$search.addEventListener("input", () => setSearch($search.value)); // 🔹 Nuevo
 
-// Atajo de teclado opcional: Ctrl+Shift+R para resetear
 document.addEventListener("keydown", (e: KeyboardEvent) => {
   if (e.ctrlKey && e.shiftKey && (e.key.toLowerCase() === "r")) {
     e.preventDefault();
@@ -278,7 +278,6 @@ document.addEventListener("keydown", (e: KeyboardEvent) => {
 // ===== Inicialización =====
 state.tasks = loadTasks();
 if (state.tasks.length === 0) {
-  // Semillas de demo si está vacío
   state.tasks = [
     { id: uid(), title: "Revisar TypeScript",          done: true,  createdAt: Date.now() - 60000 },
     { id: uid(), title: "Agregar validación de tipos", done: false, createdAt: Date.now() - 40000 },
